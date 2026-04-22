@@ -1,16 +1,17 @@
 import type { FsMappingGenerationResult } from "@/types/fs-mapping";
 import type { SpecFormState } from "@/types/spec";
 import { buildFsMappingPayload } from "@/lib/spec-json-trim";
-import { createOpenAIClient } from "@/lib/openai-client";
+import {
+  generateJsonWithGemini,
+  getGeminiModelName,
+} from "@/lib/google-gemini-client";
 
-const DEFAULT_MODEL = "gpt-4o-mini";
+const DEFAULT_MODEL = "gemini-2.0-flash";
 
 export async function runFsMappingGeneration(
   spec: SpecFormState,
 ): Promise<FsMappingGenerationResult> {
-  const modelName =
-    process.env.OPENAI_MODEL || process.env.GPT_MODEL || DEFAULT_MODEL;
-  const openai = createOpenAIClient();
+  const modelName = getGeminiModelName(DEFAULT_MODEL);
 
   const payload = buildFsMappingPayload(spec);
   const prompt = `You are an SAP ABAP functional specification author and development mapping expert.
@@ -61,25 +62,12 @@ Rules:
 - mappingSpecMarkdown MUST contain the same tables/headings as the team's template, and should be internally consistent with functionalSpecMarkdown and mappingRows.
 - Use Korean for FS and labels where appropriate.`;
 
-  const result = await openai.chat.completions.create({
+  const text = await generateJsonWithGemini({
     model: modelName,
-    messages: [
-      {
-        role: "system",
-        content:
-          "You are an SAP ABAP FS author. Always respond with a single valid JSON object only.",
-      },
-      {
-        role: "user",
-        content: `${prompt}\n\nOutput JSON only (no markdown fences).`,
-      },
-    ],
-    response_format: { type: "json_object" },
+    parts: [{ text: `${prompt}\n\nOutput JSON only (no markdown fences).` }],
     temperature: 0.25,
   });
-
-  const text = result.choices[0]?.message?.content;
-  if (!text) throw new Error("Empty response from OpenAI");
+  if (!text) throw new Error("Empty response from Gemini");
 
   const cleaned = text
     .trim()

@@ -1,18 +1,19 @@
 import type { CodeGenerationRequest, CodeGenerationResult } from "@/types/codegen";
-import { createOpenAIClient } from "@/lib/openai-client";
+import {
+  generateJsonWithGemini,
+  getGeminiModelName,
+} from "@/lib/google-gemini-client";
 import {
   CODE_SPEC_TEMPLATE_MD,
   INCLUDE_MAPPING_SPEC_MD,
 } from "@/lib/codegen-templates";
 
-const DEFAULT_MODEL = "gpt-4o-mini";
+const DEFAULT_MODEL = "gemini-2.0-flash";
 
 export async function runCodeGeneration(
   req: CodeGenerationRequest,
 ): Promise<CodeGenerationResult> {
-  const modelName =
-    process.env.OPENAI_MODEL || process.env.GPT_MODEL || DEFAULT_MODEL;
-  const openai = createOpenAIClient();
+  const modelName = getGeminiModelName(DEFAULT_MODEL);
 
   const prompt = `You are an SAP ABAP developer who strictly follows the team's standard templates.
 
@@ -63,22 +64,12 @@ spec:
 ${JSON.stringify(req.spec, null, 2)}
 `;
 
-  const result = await openai.chat.completions.create({
+  const text = await generateJsonWithGemini({
     model: modelName,
-    messages: [
-      {
-        role: "system",
-        content:
-          "You are an SAP ABAP developer. Always respond with a single valid JSON object only.",
-      },
-      { role: "user", content: prompt },
-    ],
-    response_format: { type: "json_object" },
+    parts: [{ text: prompt }],
     temperature: 0.2,
   });
-
-  const text = result.choices[0]?.message?.content;
-  if (!text) throw new Error("Empty response from OpenAI");
+  if (!text) throw new Error("Empty response from Gemini");
 
   const cleaned = text
     .trim()

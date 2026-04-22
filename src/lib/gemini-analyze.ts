@@ -5,9 +5,12 @@ import type {
   UploadPurpose,
 } from "@/types/spec";
 import { formatBusinessAreaLabel } from "@/lib/spec-helpers";
-import { createOpenAIClient } from "@/lib/openai-client";
+import {
+  generateJsonWithGemini,
+  getGeminiModelName,
+} from "@/lib/google-gemini-client";
 
-const DEFAULT_MODEL = "gpt-4o-mini";
+const DEFAULT_MODEL = "gemini-2.0-flash";
 
 export interface AnalyzePayload {
   basicInfo: BasicInfo;
@@ -137,9 +140,7 @@ function parseJsonResponse(text: string): GeminiAnalysisResult {
 export async function runGeminiAnalysis(
   payload: AnalyzePayload,
 ): Promise<GeminiAnalysisResult> {
-  const modelName =
-    process.env.OPENAI_MODEL || process.env.GPT_MODEL || DEFAULT_MODEL;
-  const openai = createOpenAIClient();
+  const modelName = getGeminiModelName(DEFAULT_MODEL);
 
   const prompt = buildPrompt(
     payload.basicInfo,
@@ -148,36 +149,24 @@ export async function runGeminiAnalysis(
     payload.fileMetadataOnly,
   );
 
-  const userContent = [
+  const parts = [
     {
-      type: "text" as const,
       text: `${prompt}\n\nRespond with a single JSON object only (no markdown fences).`,
     },
     ...payload.files.map((f) => ({
-      type: "image_url" as const,
-      image_url: {
-        url: `data:${f.mimeType || "image/png"};base64,${f.base64}`,
+      inlineData: {
+        mimeType: f.mimeType || "image/png",
+        data: f.base64,
       },
     })),
   ];
 
-  const result = await openai.chat.completions.create({
+  const text = await generateJsonWithGemini({
     model: modelName,
-    messages: [
-      {
-        role: "system",
-        content:
-          "You are an SAP ABAP functional analyst. Always respond with valid JSON only.",
-      },
-      { role: "user", content: userContent },
-    ],
-    response_format: { type: "json_object" },
+    parts,
     temperature: 0.35,
   });
 
-  const text = result.choices[0]?.message?.content;
-  if (!text) {
-    throw new Error("Empty response from OpenAI");
-  }
+  if (!text) throw new Error("Empty response from Gemini");
   return parseJsonResponse(text);
 }

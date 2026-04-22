@@ -1119,7 +1119,7 @@ export function SpecWizard() {
                   className="hidden"
                   onChange={onPickFiles("layout_reference")}
                 />
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 grid-cols-1">
                   <div
                     tabIndex={0}
                     onPointerDown={() => {
@@ -1141,10 +1141,16 @@ export function SpecWizard() {
                     role="group"
                     aria-label="테이블 DDIC 캡처 업로드"
                   >
+                    <div className="mb-3 flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-xs font-medium text-foreground">
+                      <span className="inline-flex size-5 items-center justify-center rounded-full bg-foreground/10">
+                        1
+                      </span>
+                      테이블·DDIC (필드명 추출)
+                    </div>
                     <Database className="mb-2 size-9 text-muted-foreground" />
                     <p className="text-sm font-medium">테이블·DDIC</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      SE11 등 필드·테이블명 추출
+                      SE11 등 테이블/필드명 캡처 업로드
                     </p>
                   </div>
                   <div
@@ -1168,70 +1174,112 @@ export function SpecWizard() {
                     role="group"
                     aria-label="레이아웃 참조 화면 업로드"
                   >
+                    <div className="mb-3 flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-xs font-medium text-foreground">
+                      <span className="inline-flex size-5 items-center justify-center rounded-full bg-foreground/10">
+                        2
+                      </span>
+                      레이아웃 참조 (UI 배치)
+                    </div>
                     <LayoutTemplate className="mb-2 size-9 text-muted-foreground" />
                     <p className="text-sm font-medium">레이아웃 참조</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      비슷한 화면 캡처 — 배치·그리드만
+                      비슷한 화면 캡처 — 배치·그리드 구성만
                     </p>
                   </div>
                 </div>
                 {uploads.length > 0 && (
-                  <div className="space-y-2">
+                  <div className="space-y-4">
                     <Label>업로드된 파일</Label>
-                    <ul className="divide-y rounded-lg border">
-                      {uploads.map((u) => (
-                        <li
-                          key={u.id}
-                          className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm"
-                        >
-                          <GripVertical className="size-4 shrink-0 text-muted-foreground" />
-                          <span className="min-w-0 flex-1 truncate">{u.name}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {(u.size / 1024).toFixed(0)} KB
-                          </span>
-                          <Select
-                            value={u.purpose}
-                            onValueChange={(v) =>
-                              setUploads((list) =>
-                                list.map((x) =>
-                                  x.id === u.id
-                                    ? {
-                                        ...x,
-                                        purpose: v as UploadPurpose,
-                                      }
-                                    : x,
-                                ),
-                              )
-                            }
-                          >
-                            <SelectTrigger className="h-8 w-[140px] shrink-0 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {UPLOAD_PURPOSE_OPTIONS.map((o) => (
-                                <SelectItem key={o.value} value={o.value}>
-                                  {o.label}
-                                </SelectItem>
+
+                    {(
+                      [
+                        {
+                          title: "테이블·DDIC",
+                          purpose: "ddic_table" as const,
+                          empty: "테이블·DDIC 캡처가 없습니다.",
+                        },
+                        {
+                          title: "레이아웃 참조",
+                          purpose: "layout_reference" as const,
+                          empty: "레이아웃 참조 캡처가 없습니다.",
+                        },
+                      ] as const
+                    ).map((sec) => {
+                      const list = uploads.filter((u) => u.purpose === sec.purpose);
+                      return (
+                        <div key={sec.purpose} className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm font-medium">{sec.title}</p>
+                            <span className="text-xs text-muted-foreground">
+                              {list.length}개
+                            </span>
+                          </div>
+
+                          {list.length === 0 ? (
+                            <div className="rounded-lg border bg-muted/30 px-3 py-3 text-xs text-muted-foreground">
+                              {sec.empty}
+                            </div>
+                          ) : (
+                            <ul className="divide-y rounded-lg border">
+                              {list.map((u) => (
+                                <li
+                                  key={u.id}
+                                  className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm"
+                                >
+                                  <GripVertical className="size-4 shrink-0 text-muted-foreground" />
+                                  <span className="min-w-0 flex-1 truncate">
+                                    {u.name}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {(u.size / 1024).toFixed(0)} KB
+                                  </span>
+                                  <Select
+                                    value={u.purpose}
+                                    onValueChange={(v) =>
+                                      setUploads((list2) =>
+                                        list2.map((x) =>
+                                          x.id === u.id
+                                            ? {
+                                                ...x,
+                                                purpose: v as UploadPurpose,
+                                              }
+                                            : x,
+                                        ),
+                                      )
+                                    }
+                                  >
+                                    <SelectTrigger className="h-8 w-[140px] shrink-0 text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {UPLOAD_PURPOSE_OPTIONS.map((o) => (
+                                        <SelectItem key={o.value} value={o.value}>
+                                          {o.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="shrink-0"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setUploads((list2) =>
+                                        list2.filter((x) => x.id !== u.id),
+                                      );
+                                    }}
+                                  >
+                                    <Trash2 className="size-4" />
+                                  </Button>
+                                </li>
                               ))}
-                            </SelectContent>
-                          </Select>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="shrink-0"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setUploads((list) =>
-                                list.filter((x) => x.id !== u.id),
-                              );
-                            }}
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </li>
-                      ))}
-                    </ul>
+                            </ul>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
@@ -1316,9 +1364,9 @@ export function SpecWizard() {
                     {analyzeLoading ? "분석 중…" : "AI 분석 실행"}
                   </Button>
                   <p className="text-xs text-muted-foreground">
-                    API 키는 서버 환경변수 OPENAI_API_KEY(또는 GPT_API_KEY)로
-                    설정됩니다. Vercel
-                    프로젝트에 동일 변수를 등록하세요.
+                    API 키는 서버 환경변수 OPENAI_API_KEY(또는 GPT_API_KEY,
+                    GEMINI_API_KEY)로 설정됩니다. Vercel 프로젝트에 동일 변수를
+                    등록하세요.
                   </p>
                 </CardContent>
               </Card>
