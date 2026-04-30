@@ -27,6 +27,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -1119,169 +1126,241 @@ export function SpecWizard() {
                   className="hidden"
                   onChange={onPickFiles("layout_reference")}
                 />
-                <div className="grid gap-4 grid-cols-1">
-                  <div
-                    tabIndex={0}
-                    onPointerDown={() => {
-                      pastePurposeRef.current = "ddic_table";
-                    }}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      setDragOverDd(true);
-                      setDragOverLayout(false);
-                    }}
-                    onDragLeave={() => setDragOverDd(false)}
-                    onDrop={onDropZone("ddic_table")}
-                    className={`flex min-h-[140px] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-3 py-8 text-center outline-none transition-colors focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/50 ${
-                      dragOverDd
-                        ? "border-primary bg-primary/5"
-                        : "border-muted-foreground/25 hover:bg-muted/40"
-                    }`}
-                    onClick={() => fileInputDdRef.current?.click()}
-                    role="group"
-                    aria-label="테이블 DDIC 캡처 업로드"
-                  >
-                    <div className="mb-3 flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-xs font-medium text-foreground">
-                      <span className="inline-flex size-5 items-center justify-center rounded-full bg-foreground/10">
-                        1
-                      </span>
-                      테이블·DDIC (필드명 추출)
-                    </div>
-                    <Database className="mb-2 size-9 text-muted-foreground" />
-                    <p className="text-sm font-medium">테이블·DDIC</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      SE11 등 테이블/필드명 캡처 업로드
-                    </p>
-                  </div>
-                  <div
-                    tabIndex={0}
-                    onPointerDown={() => {
-                      pastePurposeRef.current = "layout_reference";
-                    }}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      setDragOverLayout(true);
-                      setDragOverDd(false);
-                    }}
-                    onDragLeave={() => setDragOverLayout(false)}
-                    onDrop={onDropZone("layout_reference")}
-                    className={`flex min-h-[140px] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-3 py-8 text-center outline-none transition-colors focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/50 ${
-                      dragOverLayout
-                        ? "border-primary bg-primary/5"
-                        : "border-muted-foreground/25 hover:bg-muted/40"
-                    }`}
-                    onClick={() => fileInputLayoutRef.current?.click()}
-                    role="group"
-                    aria-label="레이아웃 참조 화면 업로드"
-                  >
-                    <div className="mb-3 flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-xs font-medium text-foreground">
-                      <span className="inline-flex size-5 items-center justify-center rounded-full bg-foreground/10">
-                        2
-                      </span>
-                      레이아웃 참조 (UI 배치)
-                    </div>
-                    <LayoutTemplate className="mb-2 size-9 text-muted-foreground" />
-                    <p className="text-sm font-medium">레이아웃 참조</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      비슷한 화면 캡처 — 배치·그리드 구성만
-                    </p>
-                  </div>
-                </div>
-                {uploads.length > 0 && (
-                  <div className="space-y-4">
-                    <Label>업로드된 파일</Label>
-
-                    {(
-                      [
-                        {
-                          title: "테이블·DDIC",
-                          purpose: "ddic_table" as const,
-                          empty: "테이블·DDIC 캡처가 없습니다.",
-                        },
-                        {
-                          title: "레이아웃 참조",
-                          purpose: "layout_reference" as const,
-                          empty: "레이아웃 참조 캡처가 없습니다.",
-                        },
-                      ] as const
-                    ).map((sec) => {
-                      const list = uploads.filter((u) => u.purpose === sec.purpose);
-                      return (
-                        <div key={sec.purpose} className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium">{sec.title}</p>
-                            <span className="text-xs text-muted-foreground">
-                              {list.length}개
-                            </span>
-                          </div>
-
-                          {list.length === 0 ? (
-                            <div className="rounded-lg border bg-muted/30 px-3 py-3 text-xs text-muted-foreground">
-                              {sec.empty}
+                <div className="grid min-w-0 gap-4">
+                  {(
+                    [
+                      {
+                        purpose: "ddic_table" as const,
+                        title: "테이블·DDIC",
+                        empty: "테이블·DDIC 캡처가 없습니다.",
+                        drop: (
+                          <div
+                            tabIndex={0}
+                            onPointerDown={() => {
+                              pastePurposeRef.current = "ddic_table";
+                            }}
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              setDragOverDd(true);
+                              setDragOverLayout(false);
+                            }}
+                            onDragLeave={() => setDragOverDd(false)}
+                            onDrop={onDropZone("ddic_table")}
+                            className={`flex min-h-[140px] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-3 py-8 text-center outline-none transition-colors focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/50 ${
+                              dragOverDd
+                                ? "border-primary bg-primary/5"
+                                : "border-muted-foreground/25 hover:bg-muted/40"
+                            }`}
+                            role="group"
+                            aria-label="테이블 DDIC 캡처 업로드"
+                          >
+                            <div className="mb-3 flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-xs font-medium text-foreground">
+                              <span className="inline-flex size-5 items-center justify-center rounded-full bg-foreground/10">
+                                1
+                              </span>
+                              테이블·DDIC (필드명 추출)
                             </div>
-                          ) : (
-                            <ul className="divide-y rounded-lg border">
-                              {list.map((u) => (
-                                <li
-                                  key={u.id}
-                                  className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm"
-                                >
-                                  <GripVertical className="size-4 shrink-0 text-muted-foreground" />
-                                  <span className="min-w-0 flex-1 truncate">
-                                    {u.name}
-                                  </span>
-                                  <span className="text-xs text-muted-foreground">
-                                    {(u.size / 1024).toFixed(0)} KB
-                                  </span>
-                                  <Select
-                                    value={u.purpose}
-                                    onValueChange={(v) =>
-                                      setUploads((list2) =>
-                                        list2.map((x) =>
-                                          x.id === u.id
-                                            ? {
-                                                ...x,
-                                                purpose: v as UploadPurpose,
-                                              }
-                                            : x,
-                                        ),
-                                      )
-                                    }
+                            <Database className="mb-2 size-9 text-muted-foreground" />
+                            <p className="text-sm font-medium">테이블·DDIC</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              SE11 등 테이블/필드명 캡처 업로드
+                            </p>
+                            <div className="mt-4 flex items-center gap-2">
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                className="h-8"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  fileInputDdRef.current?.click();
+                                }}
+                              >
+                                파일 선택
+                              </Button>
+                              <span className="text-xs text-muted-foreground">
+                                클릭 후 Ctrl+V로 붙여넣기
+                              </span>
+                            </div>
+                          </div>
+                        ),
+                      },
+                      {
+                        purpose: "layout_reference" as const,
+                        title: "레이아웃 참조",
+                        empty: "레이아웃 참조 캡처가 없습니다.",
+                        drop: (
+                          <div
+                            tabIndex={0}
+                            onPointerDown={() => {
+                              pastePurposeRef.current = "layout_reference";
+                            }}
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              setDragOverLayout(true);
+                              setDragOverDd(false);
+                            }}
+                            onDragLeave={() => setDragOverLayout(false)}
+                            onDrop={onDropZone("layout_reference")}
+                            className={`flex min-h-[140px] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-3 py-8 text-center outline-none transition-colors focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/50 ${
+                              dragOverLayout
+                                ? "border-primary bg-primary/5"
+                                : "border-muted-foreground/25 hover:bg-muted/40"
+                            }`}
+                            role="group"
+                            aria-label="레이아웃 참조 화면 업로드"
+                          >
+                            <div className="mb-3 flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-xs font-medium text-foreground">
+                              <span className="inline-flex size-5 items-center justify-center rounded-full bg-foreground/10">
+                                2
+                              </span>
+                              레이아웃 참조 (UI 배치)
+                            </div>
+                            <LayoutTemplate className="mb-2 size-9 text-muted-foreground" />
+                            <p className="text-sm font-medium">레이아웃 참조</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              비슷한 화면 캡처 — 배치·그리드 구성만
+                            </p>
+                            <div className="mt-4 flex items-center gap-2">
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                className="h-8"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  fileInputLayoutRef.current?.click();
+                                }}
+                              >
+                                파일 선택
+                              </Button>
+                              <span className="text-xs text-muted-foreground">
+                                클릭 후 Ctrl+V로 붙여넣기
+                              </span>
+                            </div>
+                          </div>
+                        ),
+                      },
+                    ] as const
+                  ).map((sec) => {
+                    const list = uploads.filter((u) => u.purpose === sec.purpose);
+                    return (
+                      <div
+                        key={sec.purpose}
+                        className="flex min-w-0 flex-col gap-3"
+                      >
+                        {sec.drop}
+                        {uploads.length > 0 && (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-medium">{sec.title}</p>
+                              <span className="shrink-0 text-xs text-muted-foreground">
+                                {list.length}개
+                              </span>
+                            </div>
+                            {list.length === 0 ? (
+                              <div className="rounded-lg border bg-muted/30 px-3 py-3 text-xs text-muted-foreground">
+                                {sec.empty}
+                              </div>
+                            ) : (
+                              <ul className="divide-y rounded-lg border">
+                                {list.map((u) => (
+                                  <li
+                                    key={u.id}
+                                    className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm"
                                   >
-                                    <SelectTrigger className="h-8 w-[140px] shrink-0 text-xs">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {UPLOAD_PURPOSE_OPTIONS.map((o) => (
-                                        <SelectItem key={o.value} value={o.value}>
-                                          {o.label}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="shrink-0"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setUploads((list2) =>
-                                        list2.filter((x) => x.id !== u.id),
-                                      );
-                                    }}
-                                  >
-                                    <Trash2 className="size-4" />
-                                  </Button>
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                                    <GripVertical className="size-4 shrink-0 text-muted-foreground" />
+                                    <Dialog>
+                                      <DialogTrigger
+                                        render={
+                                          <button
+                                            type="button"
+                                            className="shrink-0 rounded-md border bg-background p-0.5 hover:bg-muted/40"
+                                            aria-label={`${u.name} 미리보기`}
+                                            onClick={(e) => e.stopPropagation()}
+                                          />
+                                        }
+                                      >
+                                        <img
+                                          src={`data:${u.type};base64,${u.base64}`}
+                                          alt={u.name}
+                                          className="h-10 w-10 rounded object-cover"
+                                        />
+                                      </DialogTrigger>
+                                      <DialogContent className="sm:max-w-3xl">
+                                        <DialogHeader>
+                                          <DialogTitle className="truncate">
+                                            {u.name}
+                                          </DialogTitle>
+                                        </DialogHeader>
+                                        <div className="rounded-lg border bg-muted/20 p-2">
+                                          <img
+                                            src={`data:${u.type};base64,${u.base64}`}
+                                            alt={u.name}
+                                            className="max-h-[70vh] w-full rounded object-contain"
+                                          />
+                                        </div>
+                                      </DialogContent>
+                                    </Dialog>
+                                    <span className="min-w-0 flex-1 truncate">
+                                      {u.name}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                      {(u.size / 1024).toFixed(0)} KB
+                                    </span>
+                                    <Select
+                                      value={u.purpose}
+                                      onValueChange={(v) =>
+                                        setUploads((list2) =>
+                                          list2.map((x) =>
+                                            x.id === u.id
+                                              ? {
+                                                  ...x,
+                                                  purpose: v as UploadPurpose,
+                                                }
+                                              : x,
+                                          ),
+                                        )
+                                      }
+                                    >
+                                      <SelectTrigger className="h-8 w-[140px] max-w-full shrink-0 text-xs">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {UPLOAD_PURPOSE_OPTIONS.map((o) => (
+                                          <SelectItem
+                                            key={o.value}
+                                            value={o.value}
+                                          >
+                                            {o.label}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="shrink-0"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setUploads((list2) =>
+                                          list2.filter((x) => x.id !== u.id),
+                                        );
+                                      }}
+                                    >
+                                      <Trash2 className="size-4" />
+                                    </Button>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </CardContent>
             </Card>
           )}
@@ -2810,7 +2889,16 @@ function FieldPicker({
       <Table>
         <TableHeader className="sticky top-0 z-[1] bg-background shadow-[0_1px_0_hsl(var(--border))]">
           <TableRow>
-            <TableHead className="w-10 shrink-0" />
+            <TableHead className="w-10 shrink-0">
+              <Checkbox
+                checked={rows.length > 0 && rows.every((r) => selected.includes(r.valueKey))}
+                onCheckedChange={(c) => {
+                  if (!rows.length) return;
+                  onChange(c ? rows.map((r) => r.valueKey) : []);
+                }}
+                aria-label="전체 선택"
+              />
+            </TableHead>
             <TableHead>테이블</TableHead>
             <TableHead>필드</TableHead>
             <TableHead className="hidden sm:table-cell">유형</TableHead>

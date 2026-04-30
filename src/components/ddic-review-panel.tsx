@@ -313,14 +313,14 @@ export function DdicReviewPanel({
         {refreshError ? (
           <p className="text-xs text-destructive">{refreshError}</p>
         ) : null}
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="grid gap-2">
+        <div className="grid items-start gap-3 sm:grid-cols-2">
+          <div className="grid content-start gap-2">
             <Label>테이블 선택</Label>
             <Select
               value={activeTable}
               onValueChange={(v) => setActiveTable(v ?? "")}
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="h-10 w-full">
                 <SelectValue placeholder="테이블 선택" />
               </SelectTrigger>
               <SelectContent>
@@ -332,9 +332,10 @@ export function DdicReviewPanel({
               </SelectContent>
             </Select>
           </div>
-          <div className="grid gap-2">
+          <div className="grid content-start gap-2">
             <Label>테이블명 수정</Label>
             <Input
+              className="h-10"
               value={tableNameDraft}
               onChange={(e) => setTableNameDraft(e.target.value)}
               onBlur={() => onRenameTable(tableNameDraft)}

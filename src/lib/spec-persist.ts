@@ -21,6 +21,28 @@ import {
   defaultScreenLayout,
 } from "@/types/spec";
 
+type CrudTargetSettings = {
+  rowAdd: boolean;
+  rowDelete: boolean;
+  cellEdit: boolean;
+  multiProcess: boolean;
+  saveTarget: boolean;
+  dbCreate: boolean;
+  dbUpdate: boolean;
+  dbDelete: boolean;
+};
+
+const defaultCrudTargetSettings = (): CrudTargetSettings => ({
+  rowAdd: true,
+  rowDelete: true,
+  cellEdit: true,
+  multiProcess: true,
+  saveTarget: true,
+  dbCreate: true,
+  dbUpdate: true,
+  dbDelete: false,
+});
+
 export const SPEC_PERSIST_KEY = "abap-spec-agent-pipeline-v1";
 
 export type PersistedPipelineV1 = {
@@ -66,39 +88,77 @@ function normalizeCrudSettings(raw: unknown): CrudSettings {
   if (!raw || typeof raw !== "object") return d;
   const o = raw as Record<string, unknown>;
 
-  // v2 (current)
+  // v3 (current): targets per grid
+  if ("targets" in o && (o as any).targets && typeof (o as any).targets === "object") {
+    const rawTargets = (o as any).targets as Record<string, unknown>;
+    const next: Record<string, CrudTargetSettings> = {};
+    for (const [gridId, v] of Object.entries(rawTargets)) {
+      if (!gridId || typeof gridId !== "string") continue;
+      if (!v || typeof v !== "object") continue;
+      const tv = v as Record<string, unknown>;
+      const def = defaultCrudTargetSettings();
+      next[gridId] = {
+        rowAdd: Boolean(tv.rowAdd ?? def.rowAdd),
+        rowDelete: Boolean(tv.rowDelete ?? def.rowDelete),
+        cellEdit: Boolean(tv.cellEdit ?? def.cellEdit),
+        multiProcess: Boolean(tv.multiProcess ?? def.multiProcess),
+        saveTarget: Boolean(tv.saveTarget ?? def.saveTarget),
+        dbCreate: Boolean(tv.dbCreate ?? def.dbCreate),
+        dbUpdate: Boolean(tv.dbUpdate ?? def.dbUpdate),
+        dbDelete: Boolean(tv.dbDelete ?? def.dbDelete),
+      };
+    }
+    return { targets: next };
+  }
+
+  // v2 (legacy): targetGridId/targetGridIds + global booleans
   const hasV2Keys =
     "rowAdd" in o ||
     "cellEdit" in o ||
     "multiProcess" in o ||
     "saveTarget" in o ||
     "dbCreate" in o ||
-    "targetGridId" in o;
+    "targetGridId" in o ||
+    "targetGridIds" in o;
   if (hasV2Keys) {
-    return {
-      targetGridId: typeof o.targetGridId === "string" ? o.targetGridId : d.targetGridId,
-      rowAdd: Boolean(o.rowAdd ?? d.rowAdd),
-      rowDelete: Boolean(o.rowDelete ?? d.rowDelete),
-      cellEdit: Boolean(o.cellEdit ?? d.cellEdit),
-      multiProcess: Boolean(o.multiProcess ?? d.multiProcess),
-      saveTarget: Boolean(o.saveTarget ?? d.saveTarget),
-      dbCreate: Boolean(o.dbCreate ?? d.dbCreate),
-      dbUpdate: Boolean(o.dbUpdate ?? d.dbUpdate),
-      dbDelete: Boolean(o.dbDelete ?? d.dbDelete),
+    const rawIds = (o as any).targetGridIds;
+    const targetGridIds = Array.isArray(rawIds)
+      ? (rawIds as unknown[])
+          .filter((v): v is string => typeof v === "string" && v.trim().length > 0)
+          .map((v) => v.trim())
+      : typeof o.targetGridId === "string" && o.targetGridId.trim()
+        ? [o.targetGridId.trim()]
+        : [];
+
+    const def = defaultCrudTargetSettings();
+    const shared: CrudTargetSettings = {
+      rowAdd: Boolean((o as any).rowAdd ?? def.rowAdd),
+      rowDelete: Boolean((o as any).rowDelete ?? def.rowDelete),
+      cellEdit: Boolean((o as any).cellEdit ?? def.cellEdit),
+      multiProcess: Boolean((o as any).multiProcess ?? def.multiProcess),
+      saveTarget: Boolean((o as any).saveTarget ?? def.saveTarget),
+      dbCreate: Boolean((o as any).dbCreate ?? def.dbCreate),
+      dbUpdate: Boolean((o as any).dbUpdate ?? def.dbUpdate),
+      dbDelete: Boolean((o as any).dbDelete ?? def.dbDelete),
     };
+
+    const targets: Record<string, CrudTargetSettings> = {};
+    for (const id of targetGridIds) targets[id] = shared;
+    return { targets };
   }
 
   // legacy migration: old shape (create/update/delete/inputModes/singleGrid/multiGrid)
   const create = Boolean((o as any).create);
   const update = Boolean((o as any).update);
   const del = Boolean((o as any).delete);
-  return {
-    ...d,
-    // best-effort mapping
-    dbCreate: create || d.dbCreate,
-    dbUpdate: update || d.dbUpdate,
-    dbDelete: del || d.dbDelete,
+  // legacy에는 대상 Grid를 특정할 수 없어서, 옵션만 best-effort로 유지하고 대상은 비워둡니다.
+  const _legacyShared: CrudTargetSettings = {
+    ...defaultCrudTargetSettings(),
+    dbCreate: create || defaultCrudTargetSettings().dbCreate,
+    dbUpdate: update || defaultCrudTargetSettings().dbUpdate,
+    dbDelete: del || defaultCrudTargetSettings().dbDelete,
   };
+  return { targets: {} };
 }
 
 export function loadPersistedPipeline(): PersistedPipelineV1 | null {
