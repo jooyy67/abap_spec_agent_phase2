@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Check, Copy } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -21,10 +22,44 @@ export function CodeGenerationPanel() {
     mappingRows,
     generatedCode,
     setGeneratedCode,
+    setPhase,
   } = useSpecPipeline();
 
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [copyState, setCopyState] = React.useState<"idle" | "done" | "error">(
+    "idle",
+  );
+
+  const copyAllCode = React.useCallback(async () => {
+    const text = generatedCode.trim();
+    if (!text) return;
+
+    const selectAll = () => {
+      const el = document.querySelector<HTMLTextAreaElement>(
+        "textarea[data-codegen-output]",
+      );
+      if (!el) return;
+      el.focus();
+      el.select();
+    };
+
+    try {
+      await navigator.clipboard.writeText(generatedCode);
+      setCopyState("done");
+      selectAll();
+    } catch {
+      selectAll();
+      try {
+        const ok = document.execCommand("copy");
+        setCopyState(ok ? "done" : "error");
+      } catch {
+        setCopyState("error");
+      }
+    } finally {
+      window.setTimeout(() => setCopyState("idle"), 2000);
+    }
+  }, [generatedCode]);
 
   const runGenerateCode = React.useCallback(async () => {
     setError(null);
@@ -69,6 +104,15 @@ export function CodeGenerationPanel() {
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <Button
           type="button"
+          variant="outline"
+          size="sm"
+          className="h-9"
+          onClick={() => setPhase("code-fix")}
+        >
+          SAP 오류 반영(4단계)
+        </Button>
+        <Button
+          type="button"
           onClick={runGenerateCode}
           disabled={
             loading ||
@@ -98,14 +142,36 @@ export function CodeGenerationPanel() {
       )}
 
       <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>생성 코드</CardTitle>
-          <CardDescription>
-            REPORT/CLASS 스켈레톤이 생성됩니다. 필요에 따라 수정하세요.
-          </CardDescription>
+        <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2 space-y-0">
+          <div className="min-w-0">
+            <CardTitle>생성 코드</CardTitle>
+            <CardDescription>
+              REPORT/CLASS 스켈레톤이 생성됩니다. 필요에 따라 수정하세요.
+            </CardDescription>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 shrink-0 gap-1.5"
+            onClick={copyAllCode}
+            disabled={!generatedCode.trim()}
+          >
+            {copyState === "done" ? (
+              <Check className="size-3.5" />
+            ) : (
+              <Copy className="size-3.5" />
+            )}
+            {copyState === "done"
+              ? "복사됨"
+              : copyState === "error"
+                ? "복사 실패"
+                : "전체 복사"}
+          </Button>
         </CardHeader>
         <CardContent>
           <Textarea
+            data-codegen-output=""
             className="min-h-[320px] font-mono text-sm"
             placeholder="// 2단계에서 FS·매핑을 만든 뒤, 상단의 「ABAP 코드 생성」을 누르세요."
             value={generatedCode}

@@ -62,6 +62,16 @@ function slotsFromAreas(
   });
 }
 
+function countGridLeaves(node: LayoutPlacementNode): number {
+  if (node.kind === "grid") return node.gridId.trim() ? 1 : 0;
+  return node.children.reduce((sum, child) => sum + countGridLeaves(child), 0);
+}
+
+function splitPreviewCaption(node: LayoutPlacementNode): string | null {
+  if (node.kind !== "split") return null;
+  return node.direction === "horizontal" ? "좌우 분할" : "상하 분할";
+}
+
 /** 단일: 한 번에 하나의 Grid만 표시(조회 라디오·영역과 연계 스케치) */
 function ClassicSinglePreview({
   grids,
@@ -102,13 +112,18 @@ function ClassicSinglePreview({
   }
 
   if (slots.length === 1) {
+    const subtree = slots[0].subtree;
+    const splitCaption = subtree ? splitPreviewCaption(subtree) : null;
+    const linkedGridCount = subtree ? countGridLeaves(subtree) : slots[0].gridId ? 1 : 0;
     return (
       <div className="space-y-2">
         <p className="text-[10px] text-muted-foreground">
-          단일 화면 — 현재 연결된 Grid 한 개만 표시되는 형태입니다.
+          {splitCaption
+            ? `단일 화면 — ${splitCaption}로 ${Math.max(linkedGridCount, 2)}개 ALV를 동시에 표시하는 형태입니다.`
+            : "단일 화면 — 현재 연결된 Grid 한 개만 표시되는 형태입니다."}
         </p>
-        {slots[0].subtree ? (
-          <NodeView node={slots[0].subtree} grids={grids} />
+        {subtree ? (
+          <NodeView node={subtree} grids={grids} />
         ) : (
           <div className="flex min-h-[100px] items-center justify-center rounded-lg border-2 border-dashed border-primary/35 bg-primary/[0.06] px-2 py-4 text-center text-[11px] font-medium">
             {gname(grids, slots[0].gridId)}
@@ -242,12 +257,12 @@ function NodeView({
     );
   }
   if (node.kind === "split") {
-    const vert = node.direction === "vertical";
+    const sideBySide = node.direction === "horizontal";
     return (
       <div
         className={cn(
           "flex min-h-[88px] gap-2 rounded-lg border border-border/90 bg-muted/25 p-2",
-          vert ? "flex-row" : "flex-col",
+          sideBySide ? "flex-row" : "flex-col",
         )}
       >
         {node.children.map((ch) => (

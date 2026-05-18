@@ -3,6 +3,29 @@ import { formatGeminiError } from "@/lib/gemini-errors";
 import { runGeminiAnalysis } from "@/lib/gemini-analyze";
 import type { BasicInfo, ProgramKind, UploadPurpose } from "@/types/spec";
 
+function geminiHttpStatus(message: string): number {
+  const lower = message.toLowerCase();
+  if (
+    lower.includes("quota") ||
+    lower.includes("rate limit") ||
+    lower.includes("resource exhausted")
+  )
+    return 429;
+  if (
+    lower.includes("permission denied") ||
+    lower.includes("403") ||
+    lower.includes("access is denied")
+  )
+    return 403;
+  if (
+    lower.includes("api key") ||
+    lower.includes("gemini_api_key is not configured") ||
+    lower.includes("not configured")
+  )
+    return 400;
+  return 500;
+}
+
 function normalizePurpose(p: unknown): UploadPurpose {
   return p === "layout_reference" ? "layout_reference" : "ddic_table";
 }
@@ -60,6 +83,9 @@ export async function POST(request: Request) {
   } catch (e) {
     console.error("[api/analyze]", e);
     const message = formatGeminiError(e);
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: message },
+      { status: geminiHttpStatus(message) },
+    );
   }
 }

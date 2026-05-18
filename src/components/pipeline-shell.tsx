@@ -1,13 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { FileCode2, FileText, FormInput } from "lucide-react";
+import { Bug, FileCode2, FileText, FormInput, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSpecPipeline } from "@/context/spec-pipeline-context";
 import type { PipelinePhase } from "@/context/spec-pipeline-context";
+import { Button } from "@/components/ui/button";
 import { SpecWizard } from "@/components/spec-wizard";
 import { FsMappingWorkbench } from "@/components/fs-mapping-workbench";
 import { CodeGenerationPanel } from "@/components/code-generation-panel";
+import { SapErrorFixPanel } from "@/components/sap-error-fix-panel";
 
 const TABS: {
   id: PipelinePhase;
@@ -18,17 +20,45 @@ const TABS: {
   { id: "input", label: "1. 사용자 입력", short: "입력", icon: FormInput },
   { id: "fs-mapping", label: "2. FS · 매핑입력서", short: "FS/매핑", icon: FileText },
   { id: "code", label: "3. 코드 생성", short: "코드", icon: FileCode2 },
+  {
+    id: "code-fix",
+    label: "4. SAP 오류 반영",
+    short: "오류",
+    icon: Bug,
+  },
 ];
 
 export function PipelineShell() {
-  const { phase, setPhase } = useSpecPipeline();
+  const { phase, setPhase, resetPipeline } = useSpecPipeline();
+
+  const handleReset = React.useCallback(() => {
+    if (
+      !window.confirm(
+        "입력한 내용을 모두 지우고 처음부터 다시 시작할까요? 이 작업은 되돌릴 수 없습니다.",
+      )
+    ) {
+      return;
+    }
+    resetPipeline();
+    setPhase("input");
+  }, [resetPipeline, setPhase]);
 
   return (
     <div className="flex min-h-dvh w-full flex-1 flex-col">
       <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3">
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            ABAP Spec Agent
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-sm font-semibold">ABAP Spec Agent</div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 gap-2"
+              onClick={handleReset}
+            >
+              <RotateCcw className="size-4" />
+              입력 초기화
+            </Button>
           </div>
           <nav
             className="flex flex-wrap gap-2"
@@ -63,6 +93,7 @@ export function PipelineShell() {
         {phase === "input" && <SpecWizard />}
         {phase === "fs-mapping" && <FsMappingWorkbench />}
         {phase === "code" && <CodeGenerationPanel />}
+        {phase === "code-fix" && <SapErrorFixPanel />}
       </div>
     </div>
   );

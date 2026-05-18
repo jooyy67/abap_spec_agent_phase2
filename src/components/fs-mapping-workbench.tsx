@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Copy, Loader2, RefreshCw, Sparkles, Trash2 } from "lucide-react";
+import { Copy, Loader2, Maximize2, RefreshCw, Sparkles, Trash2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +11,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -210,11 +217,44 @@ export function FsMappingWorkbench() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="min-h-[420px] lg:min-h-[560px]">
-          <CardHeader>
-            <CardTitle>기능명세 (FS)</CardTitle>
+          <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2 space-y-0">
+            <div className="min-w-0">
+              <CardTitle>기능명세 (FS)</CardTitle>
             <CardDescription>
               읽기 전용입니다. 매핑/코드 생성의 기준 문서로 사용됩니다.
             </CardDescription>
+            </div>
+            <Dialog>
+              <DialogTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1"
+                  />
+                }
+              >
+                <Maximize2 className="size-3.5" />
+                확대
+              </DialogTrigger>
+              <DialogContent className="h-[92vh] w-[95vw] max-w-none sm:h-[90vh] sm:w-[90vw] sm:max-w-6xl">
+                <DialogHeader>
+                  <DialogTitle>기능명세 (FS)</DialogTitle>
+                </DialogHeader>
+                <ScrollArea className="h-[calc(92vh-5rem)] w-full rounded-md border p-4 sm:h-[calc(90vh-5rem)]">
+                  {functionalSpecMarkdown.trim() ? (
+                    <div className="space-y-4">
+                      <MarkdownViewer markdown={functionalSpecMarkdown} />
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      아직 생성된 FS가 없습니다. 상단의 생성 버튼을 눌러주세요.
+                    </p>
+                  )}
+                </ScrollArea>
+              </DialogContent>
+            </Dialog>
           </CardHeader>
           <CardContent className="h-[calc(100%-5rem)]">
             <div className="flex h-[min(520px,55vh)] flex-col gap-3">
@@ -255,27 +295,301 @@ export function FsMappingWorkbench() {
                 템플릿 문서 보기(읽기 전용) + 매핑 행 편집(사용자 수정)을 제공합니다.
               </CardDescription>
             </div>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() =>
-                setMappingRows((r) => [
-                  ...r,
-                  {
-                    id: newId(),
-                    area: "",
-                    uiLabel: "",
-                    tableName: "",
-                    fieldName: "",
-                    dataElement: "",
-                    notes: "",
-                  },
-                ])
-              }
-            >
-              행 추가
-            </Button>
+            <div className="flex items-center gap-2">
+              <Dialog>
+                <DialogTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1"
+                    />
+                  }
+                >
+                  <Maximize2 className="size-3.5" />
+                  확대
+                </DialogTrigger>
+                <DialogContent className="h-[92vh] w-[95vw] max-w-none sm:h-[90vh] sm:w-[90vw] sm:max-w-6xl">
+                  <DialogHeader>
+                    <DialogTitle>개발 매핑 입력서</DialogTitle>
+                  </DialogHeader>
+                  <Tabs defaultValue="doc" className="w-full">
+                    <TabsList>
+                      <TabsTrigger value="doc">문서 보기(템플릿)</TabsTrigger>
+                      <TabsTrigger value="rows">행 편집</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="doc">
+                      <ScrollArea className="h-[calc(92vh-8rem)] w-full rounded-md border p-4 sm:h-[calc(90vh-8rem)]">
+                        {mappingSpecMarkdown.trim() ? (
+                          <MarkdownViewer markdown={mappingSpecMarkdown} />
+                        ) : (
+                          <p className="text-sm text-muted-foreground">
+                            아직 생성된 템플릿 문서가 없습니다. 상단의 생성 버튼을 눌러주세요.
+                          </p>
+                        )}
+                      </ScrollArea>
+                    </TabsContent>
+                    <TabsContent value="rows">
+                      <ScrollArea className="h-[calc(92vh-8rem)] w-full rounded-md border sm:h-[calc(90vh-8rem)]">
+                        <Table>
+                          <TableHeader className="sticky top-0 z-10 bg-background">
+                            <TableRow>
+                              <TableHead className="w-[90px] bg-background">영역</TableHead>
+                              <TableHead className="min-w-[180px] bg-background">
+                                화면 항목
+                              </TableHead>
+                              <TableHead className="min-w-[160px] bg-background">테이블</TableHead>
+                              <TableHead className="min-w-[180px] bg-background">필드</TableHead>
+                              <TableHead className="min-w-[110px] bg-background">요소</TableHead>
+                              <TableHead className="min-w-[220px] bg-background">비고</TableHead>
+                              <TableHead className="w-[92px] bg-background text-right">
+                                작업
+                              </TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {mappingRows.length === 0 ? (
+                              <TableRow>
+                                <TableCell
+                                  colSpan={7}
+                                  className="text-center text-muted-foreground"
+                                >
+                                  생성 버튼을 누르거나 「행 추가」로 입력하세요.
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              mappingRows.map((row) => (
+                                <TableRow
+                                  key={row.id}
+                                  className={
+                                    !row.tableName.trim() || !row.fieldName.trim()
+                                      ? "bg-destructive/5"
+                                      : ""
+                                  }
+                                >
+                                  <TableCell className="p-1 align-top">
+                                    <Input
+                                      className="h-8 min-w-0 text-xs"
+                                      value={row.area}
+                                      onChange={(e) =>
+                                        updateRow(row.id, { area: e.target.value })
+                                      }
+                                    />
+                                  </TableCell>
+                                  <TableCell className="p-1 align-top">
+                                    <Input
+                                      className="h-8 min-w-0 text-xs"
+                                      value={row.uiLabel}
+                                      onChange={(e) =>
+                                        updateRow(row.id, { uiLabel: e.target.value })
+                                      }
+                                    />
+                                  </TableCell>
+                                  <TableCell className="p-1 align-top">
+                                    <div className="flex items-center gap-1">
+                                      {manualTable[row.id] ? (
+                                        <Input
+                                          className="h-8 min-w-0 flex-1 text-xs"
+                                          value={row.tableName}
+                                          onChange={(e) =>
+                                            updateRow(row.id, {
+                                              tableName: e.target.value,
+                                              fieldName: "",
+                                            })
+                                          }
+                                        />
+                                      ) : (
+                                        <Select
+                                          value={row.tableName}
+                                          onValueChange={(v) =>
+                                            updateRow(row.id, {
+                                              tableName: v ?? "",
+                                              fieldName: "",
+                                            })
+                                          }
+                                        >
+                                          <SelectTrigger
+                                            className="h-8 w-full min-w-0"
+                                            aria-invalid={!row.tableName.trim()}
+                                          >
+                                            <SelectValue placeholder="테이블 선택" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectGroup>
+                                              <SelectLabel>DDIC 테이블</SelectLabel>
+                                              {ddicTables.length === 0 ? (
+                                                <SelectItem value="">
+                                                  (DDIC 분석 결과 없음)
+                                                </SelectItem>
+                                              ) : null}
+                                              {ddicTables.map((t) => (
+                                                <SelectItem key={t} value={t}>
+                                                  {t}
+                                                </SelectItem>
+                                              ))}
+                                            </SelectGroup>
+                                          </SelectContent>
+                                        </Select>
+                                      )}
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-8 px-2 text-xs"
+                                        onClick={() =>
+                                          setManualTable((m) => ({
+                                            ...m,
+                                            [row.id]: !m[row.id],
+                                          }))
+                                        }
+                                      >
+                                        {manualTable[row.id] ? "선택" : "직접"}
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="p-1 align-top">
+                                    <div className="space-y-1">
+                                      <div className="flex items-center gap-1">
+                                        {manualField[row.id] ? (
+                                          <Input
+                                            className="h-8 min-w-0 flex-1 text-xs"
+                                            value={row.fieldName}
+                                            onChange={(e) =>
+                                              updateRow(row.id, { fieldName: e.target.value })
+                                            }
+                                          />
+                                        ) : (
+                                          <Select
+                                            value={row.fieldName}
+                                            onValueChange={(v) =>
+                                              updateRow(row.id, { fieldName: v ?? "" })
+                                            }
+                                          >
+                                            <SelectTrigger
+                                              className="h-8 w-full min-w-0"
+                                              aria-invalid={!row.fieldName.trim()}
+                                              disabled={!row.tableName.trim()}
+                                            >
+                                              <SelectValue
+                                                placeholder={
+                                                  row.tableName.trim()
+                                                    ? "필드 선택"
+                                                    : "테이블 먼저 선택"
+                                                }
+                                              />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              <SelectGroup>
+                                                <SelectLabel>
+                                                  {row.tableName || "필드"}
+                                                </SelectLabel>
+                                                {(ddicFieldsByTable as any)?.[row.tableName]?.map(
+                                                  (f: any) => (
+                                                    <SelectItem key={f.name} value={f.name}>
+                                                      {f.name}
+                                                    </SelectItem>
+                                                  ),
+                                                )}
+                                              </SelectGroup>
+                                            </SelectContent>
+                                          </Select>
+                                        )}
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="sm"
+                                          className="h-8 px-2 text-xs"
+                                          onClick={() =>
+                                            setManualField((m) => ({
+                                              ...m,
+                                              [row.id]: !m[row.id],
+                                            }))
+                                          }
+                                        >
+                                          {manualField[row.id] ? "선택" : "직접"}
+                                        </Button>
+                                      </div>
+                                      {row.tableName.trim() && row.fieldName.trim() ? (
+                                        <p className="text-[11px] text-muted-foreground">
+                                          {fieldMeta(row.tableName, row.fieldName)?.description ||
+                                            ""}
+                                        </p>
+                                      ) : null}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="p-1 align-top">
+                                    <Input
+                                      className="h-8 min-w-0 text-xs"
+                                      value={row.dataElement}
+                                      onChange={(e) =>
+                                        updateRow(row.id, { dataElement: e.target.value })
+                                      }
+                                    />
+                                  </TableCell>
+                                  <TableCell className="p-1 align-top">
+                                    <Input
+                                      className="h-8 min-w-0 text-xs"
+                                      value={row.notes}
+                                      onChange={(e) =>
+                                        updateRow(row.id, { notes: e.target.value })
+                                      }
+                                    />
+                                  </TableCell>
+                                  <TableCell className="p-1 align-top text-right">
+                                    <div className="flex justify-end gap-1">
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon-sm"
+                                        onClick={() => duplicateRow(row)}
+                                        aria-label="복제"
+                                      >
+                                        <Copy className="size-4" />
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon-sm"
+                                        onClick={() => deleteRow(row.id)}
+                                        aria-label="삭제"
+                                      >
+                                        <Trash2 className="size-4" />
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))
+                            )}
+                          </TableBody>
+                        </Table>
+                      </ScrollArea>
+                    </TabsContent>
+                  </Tabs>
+                </DialogContent>
+              </Dialog>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() =>
+                  setMappingRows((r) => [
+                    ...r,
+                    {
+                      id: newId(),
+                      area: "",
+                      uiLabel: "",
+                      tableName: "",
+                      fieldName: "",
+                      dataElement: "",
+                      notes: "",
+                    },
+                  ])
+                }
+              >
+                행 추가
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="doc" className="w-full">

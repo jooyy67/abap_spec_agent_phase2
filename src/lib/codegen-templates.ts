@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+
 export const CODE_SPEC_TEMPLATE_MD = `# Code Template Specification
 
 ---
@@ -446,4 +449,88 @@ export const INCLUDE_MAPPING_SPEC_MD = `# Include Mapping Specification
 - 팝업/탭 구조 사용 시 O01 / I01 추가 생성  
 - 업로드 기능 사용 시 검증 BLOCK 함께 생성  
 `;
+
+function normalizeMarkdownNewlines(markdown: string): string {
+  return markdown.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+}
+
+function extractMarkdownSection(
+  markdown: string,
+  startHeading: string,
+  endHeading?: string,
+): string {
+  const body = normalizeMarkdownNewlines(markdown);
+  const start = body.indexOf(startHeading);
+  if (start < 0) return "";
+  const from = start + startHeading.length;
+  const end = endHeading ? body.indexOf(endHeading, from) : -1;
+  return body.slice(from, end >= 0 ? end : body.length).trim();
+}
+
+/** Code Spec / Include Mapping Spec 상단의 목적·운영 원칙·생성 순서·조건 */
+export function buildCodegenGovernancePrompt(
+  codeSpecMarkdown: string,
+  includeMappingSpecMarkdown: string,
+): string {
+  const templatePrinciples = extractMarkdownSection(
+    codeSpecMarkdown,
+    "## 템플릿 운영 원칙",
+    "\n---\n\n## TOP",
+  );
+  const includeOverview = extractMarkdownSection(
+    includeMappingSpecMarkdown,
+    "## 1. 문서 개요",
+    "\n\n## 2. 프로그램",
+  );
+  const generationOrder = extractMarkdownSection(
+    includeMappingSpecMarkdown,
+    "## 11. 코드 생성 순서",
+    "\n---\n\n## 12.",
+  );
+  const generationConditions = extractMarkdownSection(
+    includeMappingSpecMarkdown,
+    "## 12. 생성 조건 / 비고",
+  );
+
+  return `## Code Template Specification — 템플릿 운영 원칙
+${templatePrinciples || "(템플릿 운영 원칙 없음)"}
+
+## Include Mapping Specification — 문서 개요
+${includeOverview || "(문서 개요 없음)"}
+
+## Include Mapping Specification — 코드 생성 순서
+${generationOrder || "(코드 생성 순서 없음)"}
+
+## Include Mapping Specification — 생성 조건 / 비고
+${generationConditions || "(생성 조건 없음)"}`;
+}
+
+export type CodegenTemplateBundle = {
+  codeSpecMarkdown: string;
+  includeMappingSpecMarkdown: string;
+};
+
+export async function loadCodegenTemplates(): Promise<CodegenTemplateBundle> {
+  const base = path.join(process.cwd(), "public", "templates");
+  let codeSpecMarkdown = CODE_SPEC_TEMPLATE_MD;
+  let includeMappingSpecMarkdown = INCLUDE_MAPPING_SPEC_MD;
+
+  try {
+    const txt = (await readFile(path.join(base, "Code_Spec.md"), "utf8")).trim();
+    if (txt) codeSpecMarkdown = txt;
+  } catch {
+    // fallback
+  }
+
+  try {
+    const txt = (
+      await readFile(path.join(base, "Include_Mapping_Spec.md"), "utf8")
+    ).trim();
+    if (txt) includeMappingSpecMarkdown = txt;
+  } catch {
+    // fallback
+  }
+
+  return { codeSpecMarkdown, includeMappingSpecMarkdown };
+}
 

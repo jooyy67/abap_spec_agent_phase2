@@ -1,5 +1,5 @@
 /** 앱 상단 파이프라인 탭 */
-export type PipelinePhase = "input" | "fs-mapping" | "code";
+export type PipelinePhase = "input" | "fs-mapping" | "code" | "code-fix";
 
 /** 프로그램 유형 */
 export type ProgramKind = "inquiry" | "crud";
@@ -55,7 +55,7 @@ export interface UploadedFileMeta {
   size: number;
   type: string;
   /** 분석 요청 시 전송 */
-  base64: string;
+  base64?: string;
   purpose: UploadPurpose;
 }
 
@@ -281,12 +281,9 @@ export interface MultiGridAreaCrudControl {
   multiSelect: boolean;
 }
 
-/** CRUD 설정 (3.4-B CRUD형 전용) */
-export interface CrudSettings {
-  /** 수정 대상 ALV Grid (CRUD형에서만 의미) */
-  targetGridId?: string;
-
-  /** 선택된 Grid에 대해서만 활성화할 입력/수정 기능 */
+/** 특정 ALV Grid에 대한 CRUD 옵션 */
+export interface CrudTargetSettings {
+  /** 입력/수정 기능 */
   rowAdd: boolean;
   rowDelete: boolean;
   cellEdit: boolean;
@@ -299,6 +296,15 @@ export interface CrudSettings {
   dbCreate: boolean;
   dbUpdate: boolean;
   dbDelete: boolean;
+}
+
+/** CRUD 설정 (3.4-B CRUD형 전용) */
+export interface CrudSettings {
+  /**
+   * Grid(ALV)별 CRUD 옵션.
+   * key는 grid.id, value는 해당 Grid에만 적용되는 CRUD 범위입니다.
+   */
+  targets: Record<string, CrudTargetSettings>;
 }
 
 /** Gemini 구조화 응답 */
@@ -371,13 +377,5 @@ export const defaultScreenLayout = (): ScreenLayout => ({
 });
 
 export const defaultCrudSettings = (): CrudSettings => ({
-  targetGridId: undefined,
-  rowAdd: true,
-  rowDelete: true,
-  cellEdit: true,
-  multiProcess: true,
-  saveTarget: true,
-  dbCreate: true,
-  dbUpdate: true,
-  dbDelete: false,
+  targets: {},
 });

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import type { MappingSheetRow } from "@/types/fs-mapping";
+import type { SapErrorScreenshotPayload } from "@/types/codegen";
 import { newId } from "@/lib/spec-helpers";
 import type {
   BasicInfo,
@@ -23,6 +24,7 @@ import {
   defaultScreenLayout,
 } from "@/types/spec";
 import {
+  clearPersistedPipeline,
   loadPersistedPipeline,
   savePersistedPipeline,
 } from "@/lib/spec-persist";
@@ -80,9 +82,16 @@ type SpecPipelineContextValue = {
   >;
 
   generatedCode: string;
+  sapActivationErrorLog: string;
+  sapErrorScreenshot: SapErrorScreenshotPayload | null;
   setGeneratedCode: React.Dispatch<React.SetStateAction<string>>;
+  setSapActivationErrorLog: React.Dispatch<React.SetStateAction<string>>;
+  setSapErrorScreenshot: React.Dispatch<
+    React.SetStateAction<SapErrorScreenshotPayload | null>
+  >;
 
   buildSpecFormState: () => SpecFormState;
+  resetPipeline: () => void;
 };
 
 const SpecPipelineContext = React.createContext<SpecPipelineContextValue | null>(
@@ -131,10 +140,30 @@ export function SpecPipelineProvider({
   >(null);
 
   const [generatedCode, setGeneratedCode] = React.useState("");
+  const [sapActivationErrorLog, setSapActivationErrorLog] =
+    React.useState("");
+  const [sapErrorScreenshot, setSapErrorScreenshot] =
+    React.useState<SapErrorScreenshotPayload | null>(null);
 
   const [canPersist, setCanPersist] = React.useState(false);
 
   React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("reset") === "1") {
+        clearPersistedPipeline();
+        params.delete("reset");
+        const qs = params.toString();
+        window.history.replaceState(
+          null,
+          "",
+          `${window.location.pathname}${qs ? `?${qs}` : ""}`,
+        );
+        setCanPersist(true);
+        return;
+      }
+    }
+
     const snap = loadPersistedPipeline();
     if (snap) {
       setPhase(snap.phase);
@@ -153,6 +182,12 @@ export function SpecPipelineProvider({
       setMappingRows(snap.mappingRows);
       setFsMappingGeneratedAt(snap.fsMappingGeneratedAt);
       setGeneratedCode(snap.generatedCode);
+      setSapActivationErrorLog(
+        typeof snap.sapActivationErrorLog === "string"
+          ? snap.sapActivationErrorLog
+          : "",
+      );
+      setSapErrorScreenshot(null);
     }
     setCanPersist(true);
   }, []);
@@ -179,6 +214,7 @@ export function SpecPipelineProvider({
         mappingRows,
         fsMappingGeneratedAt,
         generatedCode,
+        sapActivationErrorLog,
       });
     }, 400);
     return () => {
@@ -202,6 +238,7 @@ export function SpecPipelineProvider({
     mappingRows,
     fsMappingGeneratedAt,
     generatedCode,
+    sapActivationErrorLog,
   ]);
 
   const buildSpecFormState = React.useCallback((): SpecFormState => {
@@ -227,6 +264,32 @@ export function SpecPipelineProvider({
     screenFlows,
     crud,
   ]);
+
+  const resetPipeline = React.useCallback(() => {
+    clearPersistedPipeline();
+    setPhase("input");
+    setBasicInfo(defaultBasicInfo);
+    setProgramKind(null);
+    setUploads([]);
+    setGeminiRaw(null);
+    setSearchConditions([]);
+    setGrids([]);
+    setLayout(defaultScreenLayout());
+    setScreenFlows(defaultScreenFlows());
+    setCrud(defaultCrudSettings());
+    setWizardSlot(0);
+    setAnalyzeLoading(false);
+    setAnalyzeError(null);
+    setFunctionalSpecMarkdown("");
+    setMappingSpecMarkdown("");
+    setMappingRows([]);
+    setFsMappingLoading(false);
+    setFsMappingError(null);
+    setFsMappingGeneratedAt(null);
+    setGeneratedCode("");
+    setSapActivationErrorLog("");
+    setSapErrorScreenshot(null);
+  }, []);
 
   const value = React.useMemo(
     (): SpecPipelineContextValue => ({
@@ -269,8 +332,13 @@ export function SpecPipelineProvider({
       fsMappingGeneratedAt,
       setFsMappingGeneratedAt,
       generatedCode,
+      sapActivationErrorLog,
+      sapErrorScreenshot,
       setGeneratedCode,
+      setSapActivationErrorLog,
+      setSapErrorScreenshot,
       buildSpecFormState,
+      resetPipeline,
     }),
     [
       phase,
@@ -292,7 +360,10 @@ export function SpecPipelineProvider({
       fsMappingError,
       fsMappingGeneratedAt,
       generatedCode,
+      sapActivationErrorLog,
+      sapErrorScreenshot,
       buildSpecFormState,
+      resetPipeline,
     ],
   );
 

@@ -169,28 +169,44 @@ export function DdicReviewPanel({
     });
   };
 
-  const onRenameTable = (nextNameRaw: string) => {
-    const from = activeTable;
-    const to = uniqUpper(nextNameRaw);
-    if (!from || !to || from === to) return;
-    if (tableKeys.includes(to)) return; // 중복 방지
+  const onRenameTable = React.useCallback(
+    (nextNameRaw: string) => {
+      const from = activeTable;
+      const to = uniqUpper(nextNameRaw);
+      if (!from || !to || from === to) {
+        setTableNameDraft(from);
+        return;
+      }
+      if (tableKeys.includes(to)) {
+        setTableNameDraft(from);
+        return;
+      }
 
-    setGeminiRaw((prev) => {
-      if (!prev) return prev;
-      const r = renameTableEverywhere({
-        prev,
+      const { next, sc, grids: nextGrids } = renameTableEverywhere({
+        prev: geminiRaw,
         from,
         to,
         searchConditions,
         grids,
       });
-      // 연동 데이터도 함께 갱신
-      setSearchConditions(r.sc);
-      setGrids(r.grids);
+
+      setGeminiRaw(next);
+      setSearchConditions(sc);
+      setGrids(nextGrids);
       setActiveTable(to);
-      return r.next;
-    });
-  };
+      setTableNameDraft(to);
+    },
+    [
+      activeTable,
+      geminiRaw,
+      grids,
+      searchConditions,
+      setGeminiRaw,
+      setGrids,
+      setSearchConditions,
+      tableKeys,
+    ],
+  );
 
   const ddicUploads = React.useMemo(
     () => uploads.filter((u) => u.purpose === "ddic_table"),
@@ -313,14 +329,14 @@ export function DdicReviewPanel({
         {refreshError ? (
           <p className="text-xs text-destructive">{refreshError}</p>
         ) : null}
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="grid gap-2">
+        <div className="grid items-start gap-3 sm:grid-cols-2">
+          <div className="grid content-start gap-2">
             <Label>테이블 선택</Label>
             <Select
               value={activeTable}
               onValueChange={(v) => setActiveTable(v ?? "")}
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="h-10 w-full">
                 <SelectValue placeholder="테이블 선택" />
               </SelectTrigger>
               <SelectContent>
@@ -332,16 +348,23 @@ export function DdicReviewPanel({
               </SelectContent>
             </Select>
           </div>
-          <div className="grid gap-2">
+          <div className="grid content-start gap-2">
             <Label>테이블명 수정</Label>
             <Input
+              className="h-10"
               value={tableNameDraft}
               onChange={(e) => setTableNameDraft(e.target.value)}
               onBlur={() => onRenameTable(tableNameDraft)}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return;
+                e.preventDefault();
+                onRenameTable(tableNameDraft);
+              }}
               placeholder="예: ZNFITO370"
             />
             <p className="text-[11px] text-muted-foreground">
-              포커스가 빠질 때(blur) 테이블명이 적용됩니다. 대문자 기준으로 저장됩니다.
+              Enter 또는 포커스가 빠질 때(blur) 테이블명이 적용됩니다. 대문자 기준으로
+              저장됩니다.
             </p>
           </div>
         </div>
