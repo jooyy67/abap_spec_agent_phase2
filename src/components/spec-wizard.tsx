@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Database,
   FileImage,
+  FileSpreadsheet,
   GripVertical,
   LayoutTemplate,
   Loader2,
@@ -64,6 +65,7 @@ import {
 import {
   SCREEN_GRID_QUICK_TEMPLATES,
   appendScreenGridLine,
+  inferAnalyzeLayoutFromRequirements,
 } from "@/lib/screen-grid-templates";
 import { BUSINESS_MODULES } from "@/types/spec";
 import type {
@@ -189,6 +191,22 @@ function readFileAsBase64(file: File): Promise<string> {
   });
 }
 
+function isExcelLikeFile(file: { name?: string; type?: string }): boolean {
+  const name = (file.name ?? "").toLowerCase();
+  const type = (file.type ?? "").toLowerCase();
+  if (name.endsWith(".xlsx") || name.endsWith(".xls") || name.endsWith(".csv"))
+    return true;
+  return (
+    type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+    type === "application/vnd.ms-excel" ||
+    type === "text/csv"
+  );
+}
+
+function isImageUpload(u: UploadedFileMeta): boolean {
+  return Boolean(u.base64) && (u.type ?? "").startsWith("image/");
+}
+
 async function filesToUploads(
   files: FileList | File[],
   purpose: UploadPurpose,
@@ -196,15 +214,30 @@ async function filesToUploads(
   const list = Array.from(files);
   const out: UploadedFileMeta[] = [];
   for (const file of list) {
-    if (!file.type.startsWith("image/")) continue;
+    const isImage = (file.type ?? "").startsWith("image/");
+    const isExcel = isExcelLikeFile(file);
+    if (!isImage && !isExcel) continue;
     if (file.size > 2 * 1024 * 1024) continue;
-    const base64 = await readFileAsBase64(file);
+
+    if (isImage) {
+      const base64 = await readFileAsBase64(file);
+      out.push({
+        id: newId(),
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        base64,
+        purpose,
+      });
+      continue;
+    }
+
+    // 엑셀/CSV는 현재 분석(vision)에는 직접 넣지 않고 메타데이터만 유지
     out.push({
       id: newId(),
       name: file.name,
       size: file.size,
-      type: file.type,
-      base64,
+      type: file.type || "application/octet-stream",
       purpose,
     });
   }
@@ -501,12 +534,14 @@ export function SpecWizard() {
         body: JSON.stringify({
           basicInfo,
           programKind,
-          files: uploads.map((u) => ({
-            name: u.name,
-            mimeType: u.type,
-            base64: u.base64,
-            purpose: u.purpose,
-          })),
+          files: uploads
+            .filter((u) => isImageUpload(u))
+            .map((u) => ({
+              name: u.name,
+              mimeType: u.type,
+              base64: u.base64,
+              purpose: u.purpose,
+            })),
           fileMetadataOnly: uploads.map((u) => ({
             name: u.name,
             size: u.size,
@@ -530,16 +565,39 @@ export function SpecWizard() {
       setGrids(g);
       setLayout((prev) => {
         const hint = normalized.recommendedStructure?.layoutHint ?? "";
-        const inferredFromHint =
-          hint.includes("3") || hint.includes("A/B/C") || hint.includes("A,B,C")
-            ? 3
-            : hint.includes("2") || hint.includes("A/B") || hint.includes("A,B")
-              ? 2
-              : hint.includes("1")
-                ? 1
-                : null;
-        const baseCount = inferredFromHint ?? (g.length || 1);
-        const suggestedViewCount = Math.max(1, Math.min(6, baseCount));
+        const inferred = inferAnalyzeLayoutFromRequirements({
+          requirements: basicInfo.screenGridRequirements ?? "",
+          layoutHint: hint,
+          gridCount: g.length,
+        });
+
+        if (inferred.primaryAreaSplit) {
+          const { direction, gridCount } = inferred.primaryAreaSplit;
+          const children = Array.from({ length: gridCount }, (_, idx) => ({
+            kind: "grid" as const,
+            nodeId: newId(),
+            gridId: g[idx]?.id ?? "",
+          }));
+          const splitTree = createSplitNode(direction, children);
+          const next = normalizeScreenLayout({
+            ...prev,
+            layoutMode: "classic",
+            placementTree: null,
+            viewCount: 1,
+            viewSwitchConditionId: undefined,
+            areaSubtrees: Object.fromEntries(
+              (["A", "B", "C", "D", "E", "F"] as const).map((id) => [
+                id,
+                id === "A"
+                  ? splitTree
+                  : { kind: "grid" as const, nodeId: newId(), gridId: "" },
+              ]),
+            ) as ScreenLayout["areaSubtrees"],
+          });
+          return normalizeScreenLayout(next);
+        }
+
+        const suggestedViewCount = inferred.viewCount;
 
         const viewSwitchCandidate =
           suggestedViewCount >= 2
@@ -1113,7 +1171,7 @@ export function SpecWizard() {
                 <input
                   ref={fileInputDdRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/*,.xlsx,.xls,.csv"
                   multiple
                   className="hidden"
                   onChange={onPickFiles("ddic_table")}
@@ -1121,7 +1179,7 @@ export function SpecWizard() {
                 <input
                   ref={fileInputLayoutRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/*,.xlsx,.xls,.csv"
                   multiple
                   className="hidden"
                   onChange={onPickFiles("layout_reference")}
@@ -1270,38 +1328,47 @@ export function SpecWizard() {
                                     className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm"
                                   >
                                     <GripVertical className="size-4 shrink-0 text-muted-foreground" />
-                                    <Dialog>
-                                      <DialogTrigger
-                                        render={
-                                          <button
-                                            type="button"
-                                            className="shrink-0 rounded-md border bg-background p-0.5 hover:bg-muted/40"
-                                            aria-label={`${u.name} 미리보기`}
-                                            onClick={(e) => e.stopPropagation()}
-                                          />
-                                        }
-                                      >
-                                        <img
-                                          src={`data:${u.type};base64,${u.base64}`}
-                                          alt={u.name}
-                                          className="h-10 w-10 rounded object-cover"
-                                        />
-                                      </DialogTrigger>
-                                      <DialogContent className="sm:max-w-3xl">
-                                        <DialogHeader>
-                                          <DialogTitle className="truncate">
-                                            {u.name}
-                                          </DialogTitle>
-                                        </DialogHeader>
-                                        <div className="rounded-lg border bg-muted/20 p-2">
+                                    {isImageUpload(u) ? (
+                                      <Dialog>
+                                        <DialogTrigger
+                                          render={
+                                            <button
+                                              type="button"
+                                              className="shrink-0 rounded-md border bg-background p-0.5 hover:bg-muted/40"
+                                              aria-label={`${u.name} 미리보기`}
+                                              onClick={(e) => e.stopPropagation()}
+                                            />
+                                          }
+                                        >
                                           <img
                                             src={`data:${u.type};base64,${u.base64}`}
                                             alt={u.name}
-                                            className="max-h-[70vh] w-full rounded object-contain"
+                                            className="h-10 w-10 rounded object-cover"
                                           />
-                                        </div>
-                                      </DialogContent>
-                                    </Dialog>
+                                        </DialogTrigger>
+                                        <DialogContent className="sm:max-w-3xl">
+                                          <DialogHeader>
+                                            <DialogTitle className="truncate">
+                                              {u.name}
+                                            </DialogTitle>
+                                          </DialogHeader>
+                                          <div className="rounded-lg border bg-muted/20 p-2">
+                                            <img
+                                              src={`data:${u.type};base64,${u.base64}`}
+                                              alt={u.name}
+                                              className="max-h-[70vh] w-full rounded object-contain"
+                                            />
+                                          </div>
+                                        </DialogContent>
+                                      </Dialog>
+                                    ) : (
+                                      <div
+                                        className="shrink-0 rounded-md border bg-background p-2 text-muted-foreground"
+                                        aria-label={`${u.name} 파일`}
+                                      >
+                                        <FileSpreadsheet className="size-5" />
+                                      </div>
+                                    )}
                                     <span className="min-w-0 flex-1 truncate">
                                       {u.name}
                                     </span>
@@ -2684,13 +2751,13 @@ export function SpecWizard() {
                                 <div className="flex items-center gap-2">
                                   <RadioGroupItem value="split_h" id={`vm-${aid}-split-h`} />
                                   <Label htmlFor={`vm-${aid}-split-h`} className="font-normal">
-                                    상하 분할
+                                    좌우 분할
                                   </Label>
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <RadioGroupItem value="split_v" id={`vm-${aid}-split-v`} />
                                   <Label htmlFor={`vm-${aid}-split-v`} className="font-normal">
-                                    좌우 분할
+                                    상하 분할
                                   </Label>
                                 </div>
                               </RadioGroup>

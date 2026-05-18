@@ -47,10 +47,61 @@ export async function POST(request: Request) {
       );
     }
 
+    const prevGen =
+      typeof body.previousGeneratedCode === "string"
+        ? body.previousGeneratedCode.trim()
+        : "";
+    const errLog =
+      typeof body.sapActivationErrorLog === "string"
+        ? body.sapActivationErrorLog.trim()
+        : "";
+    const shot = body.sapErrorScreenshot;
+    const hasShot =
+      shot &&
+      typeof shot === "object" &&
+      typeof (shot as { data?: unknown }).data === "string" &&
+      String((shot as { data: string }).data).trim().length > 0 &&
+      typeof (shot as { mimeType?: unknown }).mimeType === "string" &&
+      String((shot as { mimeType: string }).mimeType).trim().length > 0;
+
+    const wantsSapFix = errLog.length > 0 || hasShot;
+    if (wantsSapFix && !prevGen) {
+      return NextResponse.json(
+        {
+          error:
+            "SAP 오류를 반영하려면 이전에 생성된 ABAP이 필요합니다. 3단계에서 코드를 생성하거나, 생성 코드 영역에 붙여 넣은 뒤 다시 시도해 주세요.",
+        },
+        { status: 400 },
+      );
+    }
+
+    let screenshotPayload:
+      | { mimeType: string; data: string }
+      | undefined;
+    if (hasShot && shot) {
+      const mime = String((shot as { mimeType: string }).mimeType)
+        .trim()
+        .toLowerCase();
+      if (!["image/png", "image/jpeg", "image/jpg", "image/webp"].includes(mime)) {
+        return NextResponse.json(
+          { error: "스크린샷은 PNG, JPEG, WebP만 지원합니다." },
+          { status: 400 },
+        );
+      }
+      const normalizedMime = mime === "image/jpg" ? "image/jpeg" : mime;
+      screenshotPayload = {
+        mimeType: normalizedMime,
+        data: String((shot as { data: string }).data).trim(),
+      };
+    }
+
     const data = await runCodeGeneration({
       spec: body.spec,
       functionalSpecMarkdown: body.functionalSpecMarkdown,
       mappingRows: body.mappingRows,
+      previousGeneratedCode: prevGen || undefined,
+      sapActivationErrorLog: errLog || undefined,
+      sapErrorScreenshot: screenshotPayload,
     });
     return NextResponse.json({ ok: true, data });
   } catch (e) {

@@ -208,7 +208,7 @@ function SplitOrTabsBlock({
               </span>
             ) : (
               <span className="text-[10px] font-medium text-muted-foreground">
-                {node.direction === "vertical"
+                {node.direction === "horizontal"
                   ? `좌우 분할 · ${i === 0 ? "좌" : "우"}`
                   : `상하 분할 · ${i === 0 ? "상" : "하"}`}
               </span>

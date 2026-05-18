@@ -2,7 +2,8 @@ function geminiConnectionHelp(detail?: string): string {
   const base = [
     "Gemini 서버에 연결하지 못했습니다.",
     "PC·회사망 방화벽, DNS, VPN 필요 여부를 확인한 뒤 다시 시도해 주세요.",
-    "프록시/VPN을 쓰는 경우 터미널·시스템 환경변수 HTTPS_PROXY(또는 HTTP_PROXY)를 설정하거나, .env에 동일 값을 넣은 뒤 개발 서버를 재시작해 보세요.",
+    "Next.js(Node)는 Windows의 시스템 프록시를 자동으로 쓰지 않습니다. 회사 프록시가 있다면 프로젝트 루트 .env에 HTTPS_PROXY(또는 HTTP_PROXY)를 넣고 개발 서버를 재시작하세요.",
+    "로컬 API까지 프록시를 타면 안 되는 경우 NO_PROXY=localhost,127.0.0.1 을 함께 설정해 보세요.",
   ].join(" ");
   return detail ? `${base} (${detail})` : base;
 }

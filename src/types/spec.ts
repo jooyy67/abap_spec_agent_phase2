@@ -1,5 +1,5 @@
 /** 앱 상단 파이프라인 탭 */
-export type PipelinePhase = "input" | "fs-mapping" | "code";
+export type PipelinePhase = "input" | "fs-mapping" | "code" | "code-fix";
 
 /** 프로그램 유형 */
 export type ProgramKind = "inquiry" | "crud";
@@ -55,7 +55,7 @@ export interface UploadedFileMeta {
   size: number;
   type: string;
   /** 분석 요청 시 전송 */
-  base64: string;
+  base64?: string;
   purpose: UploadPurpose;
 }
 

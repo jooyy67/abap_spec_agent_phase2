@@ -1,4 +1,7 @@
-import type { FsMappingGenerationResult } from "@/types/fs-mapping";
+import type {
+  FsMappingGenerationResult,
+  MappingSheetRow,
+} from "@/types/fs-mapping";
 import type { SpecFormState } from "@/types/spec";
 import { buildFsMappingPayload } from "@/lib/spec-json-trim";
 import {
@@ -8,7 +11,6 @@ import {
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-const DEFAULT_MODEL = "gemini-2.0-flash";
 
 // Fallback template to keep generation working even if file missing at runtime.
 const FS_TEMPLATE_FALLBACK = `# Functional Specification
@@ -339,17 +341,114 @@ FS 10 기반
 async function loadDevMappingTemplate(): Promise<string> {
   const p = path.join(process.cwd(), "public", "templates", "Dev_Mapping.md");
   try {
-    const txt = await readFile(p, "utf8");
-    return txt.trim() || DEV_MAPPING_TEMPLATE_FALLBACK;
+    const txt = (await readFile(p, "utf8")).trim();
+    return txt || DEV_MAPPING_TEMPLATE_FALLBACK;
   } catch {
     return DEV_MAPPING_TEMPLATE_FALLBACK;
   }
 }
 
+function cleanGeminiJsonText(text: string): string {
+  return text
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+}
+
+function pickString(
+  obj: Record<string, unknown>,
+  keys: string[],
+): string | undefined {
+  for (const key of keys) {
+    const value = obj[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+function pickNullableString(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed || undefined;
+}
+
+function normalizeMappingRows(raw: unknown): Omit<MappingSheetRow, "id">[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((row) => {
+    const record =
+      row && typeof row === "object"
+        ? (row as Record<string, unknown>)
+        : {};
+    return {
+      area: String(record.area ?? ""),
+      uiLabel: String(record.uiLabel ?? record.ui_label ?? ""),
+      tableName: String(record.tableName ?? record.table_name ?? ""),
+      fieldName: String(record.fieldName ?? record.field_name ?? ""),
+      dataElement: pickNullableString(record.dataElement ?? record.data_element),
+      notes: pickNullableString(record.notes),
+    };
+  });
+}
+
+function parseFsMappingGenerationResponse(
+  text: string,
+  fallbackMappingSpecMarkdown: string,
+): FsMappingGenerationResult {
+  const cleaned = cleanGeminiJsonText(text);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
+    if (start < 0 || end <= start) {
+      throw new Error("FS/매핑 JSON 파싱에 실패했습니다.");
+    }
+    parsed = JSON.parse(cleaned.slice(start, end + 1));
+  }
+
+  const root =
+    parsed && typeof parsed === "object"
+      ? (parsed as Record<string, unknown>)
+      : {};
+  const data =
+    root.data && typeof root.data === "object"
+      ? (root.data as Record<string, unknown>)
+      : root;
+
+  const functionalSpecMarkdown = pickString(data, [
+    "functionalSpecMarkdown",
+    "functional_spec_markdown",
+    "functionalSpec",
+    "fsMarkdown",
+  ]);
+  if (!functionalSpecMarkdown) {
+    throw new Error(
+      "functionalSpecMarkdown가 비어 있습니다. FS 생성 응답 형식이 올바르지 않습니다.",
+    );
+  }
+
+  const mappingSpecMarkdown =
+    pickString(data, ["mappingSpecMarkdown", "mapping_spec_markdown"]) ??
+    fallbackMappingSpecMarkdown;
+
+  const mappingRowsRaw = data.mappingRows ?? data.mapping_rows;
+  if (mappingRowsRaw !== undefined && !Array.isArray(mappingRowsRaw)) {
+    throw new Error("mappingRows는 배열이어야 합니다.");
+  }
+
+  return {
+    functionalSpecMarkdown,
+    mappingSpecMarkdown,
+    mappingRows: normalizeMappingRows(mappingRowsRaw ?? []),
+  };
+}
+
 export async function runFsMappingGeneration(
   spec: SpecFormState,
 ): Promise<FsMappingGenerationResult> {
-  const modelName = getGeminiModelName(DEFAULT_MODEL);
+  const modelName = getGeminiModelName();
 
   const payload = buildFsMappingPayload(spec);
   const fsTemplate = await loadFsTemplate();
@@ -425,23 +524,5 @@ Rules:
   });
   if (!text) throw new Error("Empty response from Gemini");
 
-  const cleaned = text
-    .trim()
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/\s*```$/i, "");
-  const parsed = JSON.parse(cleaned) as FsMappingGenerationResult;
-
-  if (
-    typeof parsed.functionalSpecMarkdown !== "string" ||
-    typeof parsed.mappingSpecMarkdown !== "string" ||
-    !Array.isArray(parsed.mappingRows)
-  ) {
-    throw new Error("Invalid FS/mapping response shape");
-  }
-
-  return {
-    functionalSpecMarkdown: parsed.functionalSpecMarkdown,
-    mappingSpecMarkdown: parsed.mappingSpecMarkdown,
-    mappingRows: parsed.mappingRows,
-  };
+  return parseFsMappingGenerationResponse(text, devMappingTemplate);
 }

@@ -63,6 +63,7 @@ export type PersistedPipelineV1 = {
   mappingRows: MappingSheetRow[];
   fsMappingGeneratedAt: string | null;
   generatedCode: string;
+  sapActivationErrorLog: string;
 };
 
 function normalizePurpose(p: unknown): UploadPurpose {
@@ -72,13 +73,14 @@ function normalizePurpose(p: unknown): UploadPurpose {
 function normalizeUpload(u: unknown): UploadedFileMeta | null {
   if (!u || typeof u !== "object") return null;
   const o = u as Record<string, unknown>;
-  if (typeof o.base64 !== "string" || typeof o.id !== "string") return null;
+  if (typeof o.id !== "string") return null;
+  const base64 = typeof o.base64 === "string" ? o.base64 : undefined;
   return {
     id: o.id,
     name: typeof o.name === "string" ? o.name : "image",
     size: typeof o.size === "number" ? o.size : 0,
     type: typeof o.type === "string" ? o.type : "image/png",
-    base64: o.base64,
+    base64,
     purpose: normalizePurpose(o.purpose),
   };
 }
@@ -174,7 +176,10 @@ export function loadPersistedPipeline(): PersistedPipelineV1 | null {
     return {
       v: 1,
       phase:
-        p.phase === "fs-mapping" || p.phase === "code" || p.phase === "input"
+        p.phase === "fs-mapping" ||
+        p.phase === "code" ||
+        p.phase === "code-fix" ||
+        p.phase === "input"
           ? p.phase
           : "input",
       basicInfo: mergeRestoredBasicInfo(
@@ -216,6 +221,10 @@ export function loadPersistedPipeline(): PersistedPipelineV1 | null {
           : null,
       generatedCode:
         typeof p.generatedCode === "string" ? p.generatedCode : "",
+      sapActivationErrorLog:
+        typeof p.sapActivationErrorLog === "string"
+          ? p.sapActivationErrorLog
+          : "",
     };
   } catch {
     return null;
@@ -228,5 +237,14 @@ export function savePersistedPipeline(state: Omit<PersistedPipelineV1, "v">): vo
     localStorage.setItem(SPEC_PERSIST_KEY, JSON.stringify(payload));
   } catch (e) {
     console.warn("[spec-persist] localStorage 저장 실패(용량 초과 등):", e);
+  }
+}
+
+export function clearPersistedPipeline(): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(SPEC_PERSIST_KEY);
+  } catch (e) {
+    console.warn("[spec-persist] localStorage 삭제 실패:", e);
   }
 }

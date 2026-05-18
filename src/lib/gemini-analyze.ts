@@ -10,8 +10,6 @@ import {
   getGeminiModelName,
 } from "@/lib/google-gemini-client";
 
-const DEFAULT_MODEL = "gemini-2.0-flash";
-
 export interface AnalyzePayload {
   basicInfo: BasicInfo;
   programKind: ProgramKind;
@@ -93,6 +91,8 @@ Image purpose rules:
 Rules:
 1. When both layout_reference and ddic_table images exist: merge — layout from former, table/field names from latter.
 2. **Multiple screens / modes (e.g. "N개 화면 분리", 계좌 체크 vs 이력 조회):** Reflect in (a) **multiple gridDrafts** (one per functional screen or ALV block), and/or (b) **searchConditionDrafts** rows with inputMode **"radio"** or **"list"** where the user switches mode, label in Korean, fieldId a synthetic name (e.g. SCREEN_MODE), tableName the driving table if any, **required: false** unless the requirement explicitly says mandatory, **affectsResult: true**. Do NOT model technical JOIN keys as user-facing required search fields unless the business asks for them as filters.
+2b. **Left-right (or top-bottom) split with two independent ALV areas (e.g. "좌측=업무A, 우측=업무B", both inquiry/edit):** Emit **two gridDrafts** for the two areas. In **recommendedStructure.layoutHint**, state simultaneous split (e.g. "좌우 동시 2 ALV, 독립 조회/입력") — NOT a radio/mode switch and NOT master-detail unless the user explicitly asks for row selection linkage or detail refresh on the opposite side.
+2c. **Left-right or top-bottom master-detail (e.g. "좌측=요약/목록, 우측=상세", "상단=마스터, 하단=디테일", 선택 행 연동):** Emit **two gridDrafts** (summary/list + detail). Put the link key in **joinCandidates** and/or **gridDrafts** notes; **recommendedStructure.layoutHint** must state split direction and row-selection refresh on the detail side — NOT a radio/mode switch between full screens.
 3. **joinCandidates vs searchConditionDrafts:** Put table-to-table links in **joinCandidates** for backend/ALV SQL. **searchConditionDrafts** = what the user types on the selection screen (dates, plant, account, mode switches). Do not dump join pairs into searchConditionDrafts as mandatory by default.
 3b. **Radio/list with different logical tables per value:** Keep one **tableName** as primary/default if needed; put **notes** (Korean) describing mapping e.g. "옵션1→테이블A 조회, 옵션2→테이블B 조회" or which grid/screen is shown per value.
 4. **gridDrafts.fields:** Only include **columns useful on screen** (typically 8–25), not every DDIC field. Prefer keys + business attributes + status; omit rarely used technical fields unless needed.
@@ -140,7 +140,7 @@ function parseJsonResponse(text: string): GeminiAnalysisResult {
 export async function runGeminiAnalysis(
   payload: AnalyzePayload,
 ): Promise<GeminiAnalysisResult> {
-  const modelName = getGeminiModelName(DEFAULT_MODEL);
+  const modelName = getGeminiModelName();
 
   const prompt = buildPrompt(
     payload.basicInfo,

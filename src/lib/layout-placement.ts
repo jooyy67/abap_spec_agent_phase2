@@ -366,7 +366,7 @@ export function summarizePlacementTreeKorean(
     return `${pad}- ALV: ${gridLabel(grids, node.gridId)}`;
   }
   if (node.kind === "split") {
-    const dir = node.direction === "vertical" ? "좌우 분할" : "상하 분할";
+    const dir = node.direction === "horizontal" ? "좌우 분할" : "상하 분할";
     const lines = [
       `${pad}- ${dir}`,
       ...node.children.map((c) => summarizePlacementTreeKorean(c, grids, depth + 1)),
